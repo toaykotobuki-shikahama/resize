@@ -6,7 +6,8 @@ const PRESETS = [
   { group: "SNS", id: "x-square", label: "X・正方形", suffix: "X正方形", width: 1200, height: 1200 },
   { group: "SNS", id: "x-wide", label: "X・横型", suffix: "X横型", width: 1200, height: 675 },
   { group: "SNS", id: "line", label: "LINE", suffix: "LINE", width: 1040, height: 1040 },
-  { group: "画面", id: "monitor", label: "モニター", suffix: "モニター", width: 1920, height: 1080 },
+  { group: "画面", id: "monitor", label: "モニター・横", suffix: "モニター横", width: 1920, height: 1080 },
+  { group: "画面", id: "monitor-p", label: "モニター・縦", suffix: "モニター縦", width: 1080, height: 1920 },
   { group: "印刷", id: "a4-p", label: "A4・縦", suffix: "A4縦", width: 2480, height: 3508 },
   { group: "印刷", id: "a4-l", label: "A4・横", suffix: "A4横", width: 3508, height: 2480 },
   { group: "印刷", id: "a3-p", label: "A3・縦", suffix: "A3縦", width: 3508, height: 4961 },
@@ -15,7 +16,8 @@ const PRESETS = [
 ];
 
 const FITS = [
-  { id: "contain", label: "余白を追加", description: "画像を切らずに全体を残す" },
+  { id: "contain", label: "余白を残す", description: "画像を切らずに全体を残す" },
+  { id: "bands", label: "帯を追加", description: "画像の比率を維持して余白をデザイン化する" },
   { id: "cover", label: "トリミング", description: "残したい位置を選んで画面いっぱいにする" },
   { id: "stretch", label: "引き伸ばす", description: "縦横比を変えて指定サイズに合わせる" },
 ];
@@ -33,6 +35,8 @@ const state = {
   cropEditor: null,
   items: [],
   busy: false,
+  band: { design: "auto", colorMode: "auto", color: "#34465d", rotation: "sequence", candidates: ["gradient", "stripes", "dots", "geometry"] },
+  previewRevision: 0,
 };
 const $ = (id) => document.getElementById(id);
 
@@ -42,7 +46,7 @@ function escapeHtml(value) {
 
 function safeBaseName(name) {
   const base = name.replace(/\.[^.]+$/, "").normalize("NFKC");
-  return base.replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_").slice(0, 80) || "image";
+  return base.replace(/[\\/:*?"<>|]+/g, "-").replace(/[\s_]+/g, "-").slice(0, 80) || "image";
 }
 
 function formatBytes(value) {
@@ -156,6 +160,7 @@ function renderFits() {
       </div>
     </fieldset>` : "";
   $("fitList").innerHTML = fitOptions + cropPositionOptions;
+  renderBandControls();
   document.querySelectorAll('input[name="fit"]').forEach((radio) => radio.addEventListener("change", () => {
     state.fit = radio.value;
     renderFits();
@@ -199,6 +204,9 @@ function loadImage(file) {
       outputName: safeBaseName(file.name),
       presetIds: [...state.presetIds],
       cropFocus: null,
+      bandOverride: null,
+      bandRandom: Math.random(),
+      bandPalette: null,
     });
     image.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`${file.name}を読み込めませんでした`)); };
     image.src = url;
@@ -206,6 +214,7 @@ function loadImage(file) {
 }
 
 async function addFiles(fileList) {
+  if (state.busy) return setStatus("保存中です。完了後に画像を追加してください");
   const files = [...fileList].filter((file) => file.type.startsWith("image/"));
   if (!files.length) return setStatus("画像ファイルを選択してください");
   try {
@@ -258,11 +267,14 @@ function renderFiles() {
           ${item.cropFocus ? '<button type="button" class="clear-crop">解除</button>' : ""}
           <button type="button" class="adjust-crop">位置を微調整</button>
         </div>` : ""}
+      ${state.fit === "bands" ? `<label class="item-band-setting">この画像の帯<select class="item-band"><option value="">一括設定を使用</option><option value="auto" ${item.bandOverride === "auto" ? "selected" : ""}>自動選択</option>${BAND_DESIGNS.map(d=>`<option value="${d.id}" ${item.bandOverride===d.id?"selected":""}>${d.label}</option>`).join("")}</select></label>` : ""}
+      <details class="output-previews" open><summary>仕上がりプレビュー（${item.presetIds.length}用途）</summary><div class="preview-grid">${item.presetIds.map(id=>`<figure><img data-preview="${id}" alt="${escapeHtml(getPreset(id).label)}の仕上がり"><figcaption>${getPreset(id).label}<span class="preview-design"></span></figcaption></figure>`).join("")}</div></details>
     </article>`).join("");
 
   document.querySelectorAll(".file-item").forEach((row) => {
     const item = state.items.find((candidate) => candidate.id === row.dataset.id);
     row.querySelector(".file-info input").addEventListener("input", (event) => { item.outputName = event.target.value; });
+    row.querySelector(".item-band")?.addEventListener("change", event => { item.bandOverride = event.target.value || null; renderFiles(); });
     row.querySelector(".save-one").addEventListener("click", () => downloadOne(item));
     row.querySelector(".adjust-crop")?.addEventListener("click", () => openCropEditor(item));
     row.querySelector(".clear-crop")?.addEventListener("click", () => {
@@ -289,6 +301,8 @@ function renderFiles() {
       if (wasOpen) document.querySelector(`.file-item[data-id="${item.id}"] details`).open = true;
     }));
   });
+  schedulePreviews();
+  if (state.busy) document.querySelectorAll("input, select, button").forEach(el => { if (!el.disabled) { el.dataset.busyDisabled = "1"; el.disabled = true; } });
 }
 
 function updateCropMarker() {
@@ -349,6 +363,7 @@ function resetCropEditor() {
 }
 
 function renderBlob(item, presetId) {
+  const fit = state.fit;
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
@@ -368,21 +383,25 @@ function renderBlob(item, presetId) {
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = "high";
 
-      if (presetId === "web-640" || state.fit === "stretch") {
+      if (presetId === "web-640" || fit === "stretch") {
         context.drawImage(image, 0, 0, width, height);
       } else {
-        const scale = state.fit === "contain"
+        const scale = (fit === "contain" || fit === "bands")
           ? Math.min(width / image.naturalWidth, height / image.naturalHeight)
           : Math.max(width / image.naturalWidth, height / image.naturalHeight);
         const drawWidth = image.naturalWidth * scale;
         const drawHeight = image.naturalHeight * scale;
-        const focus = state.fit === "cover" ? cropFocusForItem(item) : { x: 0.5, y: 0.5 };
-        const drawX = state.fit === "cover"
+        const focus = fit === "cover" ? cropFocusForItem(item) : { x: 0.5, y: 0.5 };
+        const drawX = fit === "cover"
           ? clamp(width / 2 - drawWidth * focus.x, width - drawWidth, 0)
           : (width - drawWidth) / 2;
-        const drawY = state.fit === "cover"
+        const drawY = fit === "cover"
           ? clamp(height / 2 - drawHeight * focus.y, height - drawHeight, 0)
           : (height - drawHeight) / 2;
+        if (fit === "bands") {
+          const settings = resolveBandSettings(item, image, width, height);
+          drawDesignBands(context, image, width, height, settings);
+        }
         context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
       }
 
@@ -400,7 +419,7 @@ function renderBlob(item, presetId) {
 function outputFilename(item, presetId) {
   const preset = getPreset(presetId);
   const { extension } = targetFormat(presetId);
-  return `${safeBaseName(item.outputName)}_${safeBaseName(preset.suffix)}.${extension}`;
+  return `${safeBaseName(item.outputName)}-${safeBaseName(preset.suffix)}.${extension}`;
 }
 
 function uniqueZipName(filename, usedNames) {
@@ -409,7 +428,7 @@ function uniqueZipName(filename, usedNames) {
   const dot = filename.lastIndexOf(".");
   const stem = dot >= 0 ? filename.slice(0, dot) : filename;
   const extension = dot >= 0 ? filename.slice(dot) : "";
-  while (usedNames.has(candidate)) candidate = `${stem}_${count++}${extension}`;
+  while (usedNames.has(candidate)) candidate = `${stem}-${count++}${extension}`;
   usedNames.add(candidate);
   return candidate;
 }
@@ -442,7 +461,7 @@ async function downloadOne(item) {
         setStatus(`${index + 1} / ${item.presetIds.length}点を変換しています…`);
         zip.file(uniqueZipName(outputFilename(item, presetId), usedNames), await renderBlob(item, presetId));
       }
-      triggerDownload(await zip.generateAsync({ type: "blob" }), `${safeBaseName(item.outputName)}_用途別.zip`);
+      triggerDownload(await zip.generateAsync({ type: "blob" }), `${safeBaseName(item.outputName)}-用途別.zip`);
       setStatus(`${item.presetIds.length}用途をZIPにまとめて保存しました`);
     }
   } catch (error) {
@@ -466,7 +485,7 @@ async function downloadAll() {
       setStatus(`${index + 1} / ${targets.length}点を変換しています…`);
       zip.file(uniqueZipName(outputFilename(item, presetId), usedNames), await renderBlob(item, presetId));
     }
-    triggerDownload(await zip.generateAsync({ type: "blob" }), "resized_用途別まとめ.zip");
+    triggerDownload(await zip.generateAsync({ type: "blob" }), "resized-用途別まとめ.zip");
     setStatus(`${targets.length}点をZIPにまとめて保存しました`);
   } catch (error) {
     setStatus(error.message);
@@ -477,6 +496,7 @@ async function downloadAll() {
 
 function setBusy(value) {
   state.busy = value;
+  if (!value) document.querySelectorAll("[data-busy-disabled]").forEach(el => { el.disabled = false; delete el.dataset.busyDisabled; });
   renderFiles();
 }
 
@@ -507,17 +527,19 @@ function setup() {
   $("fileInput").addEventListener("change", (event) => { addFiles(event.target.files); event.target.value = ""; });
   $("clearAll").addEventListener("click", clearAll);
   $("downloadAll").addEventListener("click", downloadAll);
-  $("customWidth").addEventListener("input", updateSummary);
-  $("customHeight").addEventListener("input", updateSummary);
-  $("background").addEventListener("input", (event) => { $("colorValue").textContent = event.target.value.toUpperCase(); });
+  $("customWidth").addEventListener("input", refreshOutput);
+  $("customHeight").addEventListener("input", refreshOutput);
+  $("background").addEventListener("input", (event) => { $("colorValue").textContent = event.target.value.toUpperCase(); refreshOutput(); });
   $("quality").addEventListener("input", (event) => {
     $("qualityValue").textContent = `${event.target.value}%`;
-    updateSummary();
+    refreshOutput();
   });
   $("format").addEventListener("change", () => {
     syncFormatControls();
-    updateSummary();
+    refreshOutput();
   });
+
+  $("transparent").addEventListener("change", refreshOutput);
 
   const cropStage = $("cropStage");
   let cropDragging = false;
@@ -549,4 +571,64 @@ function setup() {
 }
 
 window.addEventListener("beforeunload", () => state.items.forEach((item) => URL.revokeObjectURL(item.url)));
+
+function refreshOutput() { updateSummary(); schedulePreviews(); }
+function renderBandControls() {
+  const host=$("bandSettings");host.hidden=state.fit!=="bands";
+  if(host.hidden)return;
+  host.innerHTML=`<h4>帯追加設定</h4><div class="setting-grid">
+    <label>帯デザイン<select id="bandDesign"><option value="auto">自動選択</option>${BAND_DESIGNS.map(d=>`<option value="${d.id}">${d.label}</option>`).join('')}</select></label>
+    <label>帯カラー<select id="bandColorMode"><option value="auto">元画像から自動取得</option><option value="manual">手動カラー指定</option></select></label>
+    <label id="bandManualRow">手動カラー<input id="bandColor" type="color" value="${state.band.color}"></label>
+    <label>複数画像処理<select id="bandRotation"><option value="common">共通</option><option value="sequence">順番切替</option><option value="random">ランダム</option></select></label>
+    </div><fieldset id="bandCandidates"><legend>ローテーション対象（上から順に使用）</legend><div class="band-candidates">${BAND_DESIGNS.map(d=>`<label><input type="checkbox" value="${d.id}" ${state.band.candidates.includes(d.id)?'checked':''}>${d.label}</label>`).join('')}</div></fieldset>
+    <p class="band-note" id="bandHelp"></p><p class="band-note">帯は余白だけに追加します。PNGの透明余白設定より帯を優先します。画像内の透明部分は保存設定に従います。</p>`;
+  $("bandDesign").value=state.band.design;$("bandColorMode").value=state.band.colorMode;$("bandRotation").value=state.band.rotation;
+  function sync() {
+    $("bandManualRow").hidden=state.band.colorMode!=="manual";
+    $("bandCandidates").hidden=state.band.rotation==='common';
+    $("bandDesign").disabled=state.band.rotation!=='common';
+    $("bandHelp").textContent=state.band.rotation==='common'?'選択した帯デザインを全画像へ適用します。自動選択の場合は各画像に適した帯を判定します。':'チェックした候補を画像の追加順に適用します。ランダムの結果は保存時にも維持します。帯デザインの自動選択は「共通」で利用できます。';
+  }
+  for(const [id,key] of [['bandDesign','design'],['bandColorMode','colorMode'],['bandRotation','rotation'],['bandColor','color']]) {
+    $(id).addEventListener('change',e=>{state.band[key]=e.target.value;sync();renderFiles();updateSummary();});
+  }
+  $("bandCandidates").querySelectorAll('input').forEach(el=>el.addEventListener('change',()=>{
+    const selected=[...$("bandCandidates").querySelectorAll('input:checked')].map(c=>c.value);
+    if(!selected.length){el.checked=true;setStatus('帯デザインを1種類以上選択してください');return;}
+    state.band.candidates=selected;renderFiles();
+  }));sync();
+}
+let previewTimer;
+const previewUrls=new Set();
+function schedulePreviews() {
+  const revision=++state.previewRevision;
+  clearTimeout(previewTimer);
+  // Remove references before releasing previous blob URLs.
+  document.querySelectorAll('[data-preview]').forEach(el=>el.removeAttribute('src'));
+  previewUrls.forEach(url=>URL.revokeObjectURL(url));previewUrls.clear();
+  previewTimer=setTimeout(()=>renderOutputPreviews(revision),100);
+}
+async function renderOutputPreviews(revision) {
+  for(const item of state.items)for(const presetId of item.presetIds) {
+    if(revision!==state.previewRevision)return;
+    const row=document.querySelector(`.file-item[data-id="${item.id}"]`);
+    const element=row?.querySelector(`[data-preview="${presetId}"]`);
+    if(!element)continue;
+    try {
+      // Preview uses the same full-resolution encoder as downloads, including JPEG quality.
+      const blob=await renderBlob(item,presetId);
+      if(revision!==state.previewRevision)return;
+      const url=URL.createObjectURL(blob);previewUrls.add(url);element.src=url;
+      const caption=element.parentElement.querySelector('.preview-design');
+      if(state.fit==='bands' && presetId!=='web-640') {
+        const source={naturalWidth:item.width,naturalHeight:item.height};
+        const {width,height}=dimensions(presetId,source);
+        const settings=resolveBandSettings(item,source,width,height);
+        caption.textContent=bandMargins(settings.rect,width,height).length ? `帯：${BAND_DESIGNS.find(d=>d.id===settings.design).label} ${settings.color.toUpperCase()}${item.bandOverride?'（個別指定）':''}` : '余白なし';
+      } else caption.textContent=presetId==='web-640'?'高さ自動・JPG 85%':'';
+    } catch(error) {if(revision===state.previewRevision)element.alt=`プレビュー失敗：${error.message}`;}
+  }
+}
+
 setup();

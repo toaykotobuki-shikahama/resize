@@ -1,0 +1,210 @@
+{
+  "browser": "153.0.8010.0",
+  "results": [
+    {
+      "name": "縦→横1920×1080",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "横→縦1080×1920",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯生成・元画像保持：単色",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯領域描画：solid",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯生成・元画像保持：グラデーション",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯領域描画：gradient",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯生成・元画像保持：画像ぼかし",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯領域描画：blur",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯生成・元画像保持：ストライプ",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯領域描画：stripes",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯生成・元画像保持：ドット",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯領域描画：dots",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯生成・元画像保持：幾何学",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "帯領域描画：geometry",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "同率：帯なし・元画像保持",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "自動カラー：外周色",
+      "status": "PASS",
+      "detail": "{\"color\":\"#bb445e\",\"secondary\":\"#c36a81\",\"saturation\":0.7760642462773967,\"source\":\"外周\"}"
+    },
+    {
+      "name": "色フォールバック：white",
+      "status": "PASS",
+      "detail": "既定色"
+    },
+    {
+      "name": "色フォールバック：black",
+      "status": "PASS",
+      "detail": "既定色"
+    },
+    {
+      "name": "色フォールバック：transparent",
+      "status": "PASS",
+      "detail": "既定色"
+    },
+    {
+      "name": "色フォールバック：inner",
+      "status": "PASS",
+      "detail": "画像全体"
+    },
+    {
+      "name": "順番切替",
+      "status": "PASS",
+      "detail": "gradient,stripes,dots,geometry,gradient"
+    },
+    {
+      "name": "ランダム固定 0",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "ランダム固定 1",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "ランダム固定 2",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "候補1種類",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "個別指定優先",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "手動カラー",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "自動デザイン",
+      "status": "PASS",
+      "detail": "blur"
+    },
+    {
+      "name": "プレビューと出力のバイト一致",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "複数画像ZIP",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "アンダースコアなし",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "重複ファイル名連番",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "元画像比率",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "JPG書き出し",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "従来PNG透明余白",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "WEB高さ自動",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "任意サイズ",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "既存3方式・上下中央・任意焦点・WEB：28ケース原版バイト一致",
+      "status": "PASS"
+    },
+    {
+      "name": "デスクトップ・390px幅UI：横はみ出しなし",
+      "status": "PASS"
+    },
+    {
+      "name": "個別保存UI",
+      "status": "PASS"
+    },
+    {
+      "name": "ZIP保存UI：実ダウンロード展開2件",
+      "status": "PASS"
+    },
+    {
+      "name": "ブラウザ例外なし",
+      "status": "PASS"
+    }
+  ]
+}
