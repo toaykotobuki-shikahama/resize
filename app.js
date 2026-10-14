@@ -35,7 +35,7 @@ const state = {
   cropEditor: null,
   items: [],
   busy: false,
-  band: { design: "auto", colorMode: "auto", color: "#34465d", rotation: "sequence", candidates: ["gradient", "stripes", "dots", "geometry"] },
+  band: { design: "auto", colorMode: "auto", color: "#66a9ed", secondary: "#85d6cc", tone: "bright", frame: true, rotation: "sequence", candidates: ["satin", "pearl", "paper", "bright-geometry"] },
   previewRevision: 0,
 };
 const $ = (id) => document.getElementById(id);
@@ -362,7 +362,8 @@ function resetCropEditor() {
   setStatus("共通のトリミング位置へ戻しました");
 }
 
-function renderBlob(item, presetId) {
+async function renderBlob(item, presetId) {
+  await BAND_TEXTURE_READY;
   const fit = state.fit;
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -579,20 +580,26 @@ function renderBandControls() {
   host.innerHTML=`<h4>帯追加設定</h4><div class="setting-grid">
     <label>帯デザイン<select id="bandDesign"><option value="auto">自動選択</option>${BAND_DESIGNS.map(d=>`<option value="${d.id}">${d.label}</option>`).join('')}</select></label>
     <label>帯カラー<select id="bandColorMode"><option value="auto">元画像から自動取得</option><option value="manual">手動カラー指定</option></select></label>
-    <label id="bandManualRow">手動カラー<input id="bandColor" type="color" value="${state.band.color}"></label>
+    <div id="bandManualRow" class="manual-colors"><label>主色<input id="bandColor" type="color" value="${state.band.color}"></label><label>アクセント色<input id="bandSecondary" type="color" value="${state.band.secondary}"></label></div>
+    <label>明るさ（自動カラー）<select id="bandTone"><option value="bright">明るめ</option><option value="normal">標準</option><option value="calm">落ち着いた</option></select></label>
     <label>複数画像処理<select id="bandRotation"><option value="common">共通</option><option value="sequence">順番切替</option><option value="random">ランダム</option></select></label>
-    </div><fieldset id="bandCandidates"><legend>ローテーション対象（上から順に使用）</legend><div class="band-candidates">${BAND_DESIGNS.map(d=>`<label><input type="checkbox" value="${d.id}" ${state.band.candidates.includes(d.id)?'checked':''}>${d.label}</label>`).join('')}</div></fieldset>
+    </div><label class="band-frame-toggle"><input id="bandFrame" type="checkbox" ${state.band.frame?"checked":""}>画像との境界に明るいラインを入れる</label>
+    <div class="texture-gallery" aria-label="テクスチャ見本">${BAND_DESIGNS.filter(d=>d.texture).map(d=>`<button type="button" data-texture="${d.id}" title="${d.label}を全画像の共通デザインにする"><img src="data:image/svg+xml;charset=utf-8,${escapeHtml(encodeURIComponent(BAND_TEXTURE_SOURCES[d.id]))}" alt=""><span>${d.label}</span></button>`).join("")}</div>
+    <fieldset id="bandCandidates"><legend>ローテーション対象（上から順に使用）</legend><div class="band-candidates">${BAND_DESIGNS.map(d=>`<label><input type="checkbox" value="${d.id}" ${state.band.candidates.includes(d.id)?'checked':''}>${d.label}</label>`).join('')}</div></fieldset>
     <p class="band-note" id="bandHelp"></p><p class="band-note">帯は余白だけに追加します。PNGの透明余白設定より帯を優先します。画像内の透明部分は保存設定に従います。</p>`;
-  $("bandDesign").value=state.band.design;$("bandColorMode").value=state.band.colorMode;$("bandRotation").value=state.band.rotation;
+  $("bandDesign").value=state.band.design;$("bandColorMode").value=state.band.colorMode;$("bandRotation").value=state.band.rotation;$("bandTone").value=state.band.tone;
   function sync() {
     $("bandManualRow").hidden=state.band.colorMode!=="manual";
+    $("bandTone").disabled=state.band.colorMode==="manual";
     $("bandCandidates").hidden=state.band.rotation==='common';
     $("bandDesign").disabled=state.band.rotation!=='common';
     $("bandHelp").textContent=state.band.rotation==='common'?'選択した帯デザインを全画像へ適用します。自動選択の場合は各画像に適した帯を判定します。':'チェックした候補を画像の追加順に適用します。ランダムの結果は保存時にも維持します。帯デザインの自動選択は「共通」で利用できます。';
   }
-  for(const [id,key] of [['bandDesign','design'],['bandColorMode','colorMode'],['bandRotation','rotation'],['bandColor','color']]) {
+  for(const [id,key] of [['bandDesign','design'],['bandColorMode','colorMode'],['bandRotation','rotation'],['bandColor','color'],['bandSecondary','secondary'],['bandTone','tone']]) {
     $(id).addEventListener('change',e=>{state.band[key]=e.target.value;sync();renderFiles();updateSummary();});
   }
+  $("bandFrame").addEventListener("change",event=>{state.band.frame=event.target.checked;renderFiles();});
+  host.querySelectorAll("[data-texture]").forEach(button=>button.addEventListener("click",()=>{state.band.design=button.dataset.texture;state.band.rotation="common";renderBandControls();renderFiles();updateSummary();}));
   $("bandCandidates").querySelectorAll('input').forEach(el=>el.addEventListener('change',()=>{
     const selected=[...$("bandCandidates").querySelectorAll('input:checked')].map(c=>c.value);
     if(!selected.length){el.checked=true;setStatus('帯デザインを1種類以上選択してください');return;}
@@ -625,7 +632,7 @@ async function renderOutputPreviews(revision) {
         const source={naturalWidth:item.width,naturalHeight:item.height};
         const {width,height}=dimensions(presetId,source);
         const settings=resolveBandSettings(item,source,width,height);
-        caption.textContent=bandMargins(settings.rect,width,height).length ? `帯：${BAND_DESIGNS.find(d=>d.id===settings.design).label} ${settings.color.toUpperCase()}${item.bandOverride?'（個別指定）':''}` : '余白なし';
+        caption.textContent=bandMargins(settings.rect,width,height).length ? `帯：${BAND_DESIGNS.find(d=>d.id===settings.design).label} ${settings.color.toUpperCase()} / ${settings.secondary.toUpperCase()}${item.bandOverride?'（個別指定）':''}` : '余白なし';
       } else caption.textContent=presetId==='web-640'?'高さ自動・JPG 85%':'';
     } catch(error) {if(revision===state.previewRevision)element.alt=`プレビュー失敗：${error.message}`;}
   }

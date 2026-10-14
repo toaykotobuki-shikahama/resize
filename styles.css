@@ -231,3 +231,11 @@ button { color: inherit; }
 .fit-icon.bands { background:repeating-linear-gradient(45deg,#758aa8,#758aa8 3px,#d9e2ed 3px,#d9e2ed 8px); }
 [hidden] { display:none !important; }
 .output-panel .output-previews summary, .output-panel .preview-grid figcaption { color:#c4d3e3; }
+.manual-colors { display:flex; gap:14px; align-items:center; grid-column:1 / -1; }
+.manual-colors label { display:flex; align-items:center; gap:8px; }
+.band-frame-toggle { display:flex; gap:6px; align-items:center; font-size:11px; margin-top:14px; color:#52647c; }
+.texture-gallery { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:14px; }
+.texture-gallery button { padding:0; border:1px solid #ccd6e5; border-radius:8px; overflow:hidden; background:white; cursor:pointer; }
+.texture-gallery button:hover { border-color:#0a78d1; }
+.texture-gallery img { display:block; width:100%; height:45px; object-fit:cover; background:linear-gradient(125deg,#87b6f3,#a4ddd3); }
+.texture-gallery span { display:block; font-size:10px; padding:6px 2px; color:#26354d; }
